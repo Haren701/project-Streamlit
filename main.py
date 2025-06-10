@@ -3,21 +3,31 @@ import pandas as pd
 import altair as alt
 from collections import Counter
 
+# 구글 드라이브 링크를 직접 다운로드 가능한 형태로 변환
+def gdrive_to_raw(gid):
+    return f"https://drive.google.com/uc?id={gid}"
+
+# 데이터 불러오기 (컬럼 정리 포함)
 @st.cache_data
 def load_data():
-    steam = pd.read_csv('https://drive.google.com/uc?id=1A_BG5jSFNhf767TEtNbmmoA6dWCzOruG')
-    desc = pd.read_csv('https://drive.google.com/uc?id=1QbdPyNpHpkPSXZUzQucHkY6MmtedJLgI')
-    media = pd.read_csv('https://drive.google.com/uc?id=1PqNoE2a_9vJVwWTjDpVipD5p8kBB5-Cz')
-    requirements = pd.read_csv('https://drive.google.com/uc?id=141XWiKtqJRQCUhpzhhLKvk5lcPBW7WlS')
-    support = pd.read_csv('https://drive.google.com/uc?id=1IiOvUwVf0J4vwSNyYJqjKgeZ0akI14XS')
-    tags = pd.read_csv('https://drive.google.com/uc?id=1qcSg_as9wRvqlBLLMj2NGBQ9t9DHXsBR')
-    return steam, desc, media, requirements, support, tags
+    steam = pd.read_csv(gdrive_to_raw("1A_BG5jSFNhf767TEtNbmmoA6dWCzOruG"))
+    desc = pd.read_csv(gdrive_to_raw("1QbdPyNpHpkPSXZUzQucHkY6MmtedJLgI"))
+    media = pd.read_csv(gdrive_to_raw("1PqNoE2a_9vJVwWTjDpVipD5p8kBB5-Cz"))
+    tags = pd.read_csv(gdrive_to_raw("141XWiKtqJRQCUhpzhhLKvk5lcPBW7WlS"))
+    support = pd.read_csv(gdrive_to_raw("1IiOvUwVf0J4vwSNyYJqjKgeZ0akI14XS"))
+    require = pd.read_csv(gdrive_to_raw("1qcSg_as9wRvqlBLLMj2NGBQ9t9DHXsBR"))
 
-steam, desc, media, requirements, support, tags = load_data()
+    # 컬럼 정리 (공백 제거 + 소문자 변환)
+    for df in [steam, desc, media, tags, support, require]:
+        df.columns = df.columns.str.strip().str.lower()
+
+    return steam, desc, media, tags, support, require
+
+steam, desc, media, tags, support, require = load_data()
 
 st.title("🎮 Steam 게임 탐색기")
 
-# 게임 이름 검색
+# 게임 검색
 search = st.text_input("게임 이름 검색")
 if search:
     filtered = steam[steam['name'].str.contains(search, case=False, na=False)]
@@ -34,39 +44,45 @@ if search:
         if not desc_row.empty:
             st.markdown(f"**설명:** {desc_row.iloc[0]['short_description']}")
 
-        # 이미지
+        # 미디어 이미지
         media_row = media[media['steam_appid'] == game['appid']]
         if not media_row.empty:
             st.image(media_row.iloc[0]['header_image'], use_column_width=True)
 
-        # 지원
+        # 지원 정보
         support_row = support[support['steam_appid'] == game['appid']]
         if not support_row.empty:
-            st.write(f"**지원 이메일:** {support_row.iloc[0]['support_email']}")
-            st.write(f"**지원 URL:** {support_row.iloc[0]['support_url']}")
+            st.markdown(f"**지원 이메일:** {support_row.iloc[0]['support_email']}")
+            st.markdown(f"**지원 URL:** {support_row.iloc[0]['support_url']}")
 
-        # 요구 사항
-        req_row = requirements[requirements['steam_appid'] == game['appid']]
+        # 요구 사양
+        req_row = require[require['steam_appid'] == game['appid']]
         if not req_row.empty:
-            st.write("**최소 요구 사항:**")
-            st.markdown(req_row.iloc[0]['minimum'], unsafe_allow_html=True)
+            st.markdown("**최소 요구 사양:**")
+            st.markdown(req_row.iloc[0]['minimum_requirements'], unsafe_allow_html=True)
 
 # 인기 게임 TOP 10
-st.header("🔥 인기 게임 TOP 10 (긍정 리뷰)")
-top10 = steam.sort_values(by="positive_ratings", ascending=False).head(10)
-st.dataframe(top10[['name', 'positive_ratings', 'price']])
+st.header("🔥 인기 게임 TOP 10 (긍정 리뷰 수)")
+if "positive_ratings" in steam.columns:
+    top10 = steam.sort_values(by="positive_ratings", ascending=False).head(10)
+    st.dataframe(top10[['name', 'positive_ratings', 'price']])
+else:
+    st.warning("⚠️ 'positive_ratings' 컬럼이 존재하지 않아 정렬할 수 없습니다.")
 
-# 가격 대비 평점 시각화
-st.header("💰 가격 대비 리뷰 수")
-chart_data = steam[steam['price'] > 0]
-chart = alt.Chart(chart_data).mark_circle(size=60).encode(
-    x='price',
-    y='positive_ratings',
-    tooltip=['name', 'price', 'positive_ratings']
-).interactive()
-st.altair_chart(chart, use_container_width=True)
+# 가격 대비 긍정 리뷰 수
+st.header("💰 가격 대비 긍정 리뷰 수")
+if "positive_ratings" in steam.columns and "price" in steam.columns:
+    chart_data = steam[steam['price'] > 0]
+    chart = alt.Chart(chart_data).mark_circle(size=60).encode(
+        x='price',
+        y='positive_ratings',
+        tooltip=['name', 'price', 'positive_ratings']
+    ).interactive()
+    st.altair_chart(chart, use_container_width=True)
+else:
+    st.warning("시각화에 필요한 컬럼이 누락되었습니다.")
 
-# 장르별 분석
+# 장르별 게임 수
 st.header("📚 장르별 게임 수")
 def count_genres(genres_series):
     genre_list = []
@@ -78,8 +94,9 @@ genre_df = count_genres(steam['genres'])
 st.bar_chart(genre_df.set_index('Genre'))
 
 # 태그 많은 게임 TOP 10
-st.header("🏷️ 태그 많은 게임 TOP 10")
-tags['tag_count'] = tags.drop('appid', axis=1).notnull().sum(axis=1)
-top_tags = tags.sort_values(by='tag_count', ascending=False).head(10)
-top_tags = top_tags.merge(steam[['appid', 'name']], on='appid', how='left')
-st.dataframe(top_tags[['name', 'tag_count']])
+st.header("🏷️ 가장 많은 태그를 가진 게임 TOP 10")
+if "steamspy_tags" in steam.columns:
+    tag_counts = steam.copy()
+    tag_counts['tag_count'] = steam['steamspy_tags'].apply(lambda x: len(str(x).split(',')) if pd.notna(x) else 0)
+    top_tags = tag_counts.sort_values(by='tag_count', ascending=False).head(10)
+    st.dataframe(top_tags[['name', 'tag_count', 'steamspy_tags']])
