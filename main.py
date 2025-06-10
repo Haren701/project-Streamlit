@@ -3,11 +3,11 @@ import pandas as pd
 import altair as alt
 from collections import Counter
 
-# 구글 드라이브 파일 다운로드용 링크 변환
+# 구글 드라이브 파일 링크를 직접 다운로드 가능한 링크로 변환
 def gdrive_to_raw(gid):
     return f"https://drive.google.com/uc?id={gid}"
 
-# 데이터 불러오기
+# 데이터 로드 함수
 @st.cache_data
 def load_data():
     steam = pd.read_csv(gdrive_to_raw("1A_BG5jSFNhf767TEtNbmmoA6dWCzOruG"))      # steam.csv
@@ -17,12 +17,17 @@ def load_data():
     support = pd.read_csv(gdrive_to_raw("1IiOvUwVf0J4vwSNyYJqjKgeZ0akI14XS"))    # support
     require = pd.read_csv(gdrive_to_raw("1qcSg_as9wRvqlBLLMj2NGBQ9t9DHXsBR"))    # requirements
 
-    # 컬럼 정리
+    # 컬럼명 소문자 및 공백 제거
     for df in [steam, desc, media, tags, support, require]:
         df.columns = df.columns.str.strip().str.lower()
 
-    # 태그 병합
-    steam = steam.merge(tags[['appid', 'tags']], how='left', left_on='appid', right_on='appid')
+    # 'tags' 파일 병합 (컬럼 존재할 경우만)
+    if 'steam_appid' in tags.columns and 'tag' in tags.columns:
+        tag_summary = tags.groupby('steam_appid')['tag'].apply(lambda x: ', '.join(x)).reset_index()
+        tag_summary.columns = ['steam_appid', 'tags']
+        steam = steam.merge(tag_summary, how='left', left_on='appid', right_on='steam_appid')
+    else:
+        steam['tags'] = None
 
     return steam, desc, media, support, require
 
