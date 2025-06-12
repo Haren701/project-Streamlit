@@ -20,18 +20,33 @@ for filename, file_id in file_ids.items():
 
 # 데이터 로드
 steam = pd.read_csv("steam.csv")
+
+# 추가 데이터 로드
 desc = pd.read_csv("steam_description_data.csv")
 media = pd.read_csv("steam_media_data.csv")
 require = pd.read_csv("steam_requirements_data.csv")
 support = pd.read_csv("steam_support_info.csv")
 tags = pd.read_csv("steamspy_tag_data.csv")
 
-# 데이터 병합
-steam = steam.merge(desc, on="appid", how="left")
-steam = steam.merge(media, on="appid", how="left")
-steam = steam.merge(require, on="appid", how="left")
-steam = steam.merge(support, on="appid", how="left")
-steam = steam.merge(tags[["appid", "tags"]].rename(columns={"tags": "steamspy_tags"}), on="appid", how="left")
+# 병합 전에 appid 컬럼 존재 여부 확인
+def safe_merge(df1, df2, name):
+    if 'appid' in df2.columns:
+        return df1.merge(df2, on='appid', how='left')
+    else:
+        st.warning(f"⚠️ 병합 실패: '{name}' 데이터에 'appid' 컬럼이 없습니다.")
+        return df1
+
+steam = safe_merge(steam, desc, "desc")
+steam = safe_merge(steam, media, "media")
+steam = safe_merge(steam, require, "require")
+steam = safe_merge(steam, support, "support")
+
+# steamspy_tag_data는 특별 처리 필요
+if 'appid' in tags.columns and 'tags' in tags.columns:
+    tags = tags.rename(columns={'tags': 'steamspy_tags'})
+    steam = steam.merge(tags[['appid', 'steamspy_tags']], on='appid', how='left')
+else:
+    st.warning("⚠️ steamspy_tag_data.csv에서 'appid' 또는 'tags' 컬럼이 없습니다.")
 
 # Streamlit UI
 st.title("🎮 Steam 게임 탐색기")
