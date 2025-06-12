@@ -114,3 +114,7 @@ if "steamspy_tags" in steam.columns:
     st.dataframe(top_tags[['name', 'tag_count', 'steamspy_tags']])
 else:
     st.warning("⚠️ 'steamspy_tags' 컬럼이 없어 태그 정보를 표시할 수 없습니다.")
+
+
+st.write("Steam 데이터셋 컬럼 목록:")
+st.write(steam.columns.tolist())
