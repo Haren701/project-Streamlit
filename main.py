@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 
 # Load data from GitHub raw URLs
-steam_df = pd.read_csv(github_base + "steam.csv")
-support_df = pd.read_csv(github_base + "steam_support_info.csv")
-tags_df = pd.read_csv(github_base + "steamspy_tag_data.csv")
+steam_df = pd.read_csv("steam.csv")
+support_df = pd.read_csv("steam_support_info.csv")
+tags_df = pd.read_csv("steamspy_tag_data.csv")
 
 # Merge data
 steam_df = steam_df.merge(support_df, left_on="appid", right_on="steam_appid", how="left")
