@@ -1,98 +1,71 @@
 import streamlit as st
 import pandas as pd
-import gdown
-import os
-import plotly.express as px
 
-# Google Drive 파일들 다운로드
-file_ids = {
-    "steam.csv": "1A_BG5jSFNhf767TEtNbmmoA6dWCzOruG",
-    "steam_description_data.csv": "1QbdPyNpHpkPSXZUzQucHkY6MmtedJLgI",
-    "steam_media_data.csv": "1PqNoE2a_9vJVwWTjDpVipD5p8kBB5-Cz",
-    "steam_requirements_data.csv": "141XWiKtqJRQCUhpzhhLKvk5lcPBW7WlS",
-    "steam_support_info.csv": "1IiOvUwVf0J4vwSNyYJqjKgeZ0akI14XS",
-    "steamspy_tag_data.csv": "1qcSg_as9wRvqlBLLMj2NGBQ9t9DHXsBR"
-}
+# Load data from GitHub raw URLs
+github_base = "https://raw.githubusercontent.com/your-username/your-repo/main/"
+steam_df = pd.read_csv(github_base + "steam.csv")
+support_df = pd.read_csv(github_base + "steam_support_info.csv")
+tags_df = pd.read_csv(github_base + "steamspy_tag_data.csv")
 
-for filename, file_id in file_ids.items():
-    if not os.path.exists(filename):
-        gdown.download(f"https://drive.google.com/uc?id={file_id}", filename, quiet=False)
+# Merge data
+steam_df = steam_df.merge(support_df, left_on="appid", right_on="steam_appid", how="left")
+steam_df = steam_df.merge(tags_df, on="appid", how="left")
 
-# 데이터 로드
-steam = pd.read_csv("steam.csv")
-
-# 추가 데이터 로드
-desc = pd.read_csv("steam_description_data.csv")
-media = pd.read_csv("steam_media_data.csv")
-require = pd.read_csv("steam_requirements_data.csv")
-support = pd.read_csv("steam_support_info.csv")
-tags = pd.read_csv("steamspy_tag_data.csv")
-
-# 병합 전에 appid 컬럼 존재 여부 확인
-def safe_merge(df1, df2, name):
-    if 'appid' in df2.columns:
-        return df1.merge(df2, on='appid', how='left')
-    else:
-        st.warning(f"⚠️ 병합 실패: '{name}' 데이터에 'appid' 컬럼이 없습니다.")
-        return df1
-
-steam = safe_merge(steam, desc, "desc")
-steam = safe_merge(steam, media, "media")
-steam = safe_merge(steam, require, "require")
-steam = safe_merge(steam, support, "support")
-
-# steamspy_tag_data는 특별 처리 필요
-if 'appid' in tags.columns and 'tags' in tags.columns:
-    tags = tags.rename(columns={'tags': 'steamspy_tags'})
-    steam = steam.merge(tags[['appid', 'steamspy_tags']], on='appid', how='left')
-else:
-    st.warning("⚠️ steamspy_tag_data.csv에서 'appid' 또는 'tags' 컬럼이 없습니다.")
-
-# Streamlit UI
+st.set_page_config(page_title="Steam 게임 탐색기", layout="wide")
 st.title("🎮 Steam 게임 탐색기")
 
-# 게임 검색
-search_term = st.text_input("게임 이름 검색")
-if search_term:
-    results = steam[steam['name'].str.contains(search_term, case=False, na=False)]
-    st.write(results[['name', 'release_date', 'price', 'positive_ratings']].head(10))
+# Sidebar filters
+st.sidebar.header("🔍 필터")
+name_query = st.sidebar.text_input("게임 이름 검색")
+developer_filter = st.sidebar.multiselect("개발사 선택", options=steam_df['developer'].dropna().unique())
+genre_filter = st.sidebar.multiselect("장르 선택", options=steam_df['genres'].dropna().unique())
 
-# 인기 게임 Top 10
-if 'positive_ratings' in steam.columns:
-    st.subheader("🔥 인기 게임 TOP 10 (긍정 리뷰 수 기준)")
-    top10 = steam.sort_values(by='positive_ratings', ascending=False).head(10)
-    st.write(top10[['name', 'positive_ratings']])
-    fig = px.bar(top10, x='name', y='positive_ratings', title="긍정 리뷰 상위 게임")
-    st.plotly_chart(fig)
-else:
-    st.warning("⚠️ 'positive_ratings' 컬럼이 없어 인기 순위를 표시할 수 없습니다.")
+price_max = float(steam_df['price'].max())
+price_range = st.sidebar.slider("가격 범위", 0.0, price_max, (0.0, price_max))
 
-# 가격 대비 리뷰 수
-if 'price' in steam.columns and 'positive_ratings' in steam.columns:
-    st.subheader("💰 가격 대비 긍정 리뷰 수")
-    filtered = steam[steam['price'] > 0]
-    filtered['value_score'] = filtered['positive_ratings'] / filtered['price']
-    top_value = filtered.sort_values(by='value_score', ascending=False).head(10)
-    st.write(top_value[['name', 'price', 'positive_ratings', 'value_score']])
-    fig2 = px.bar(top_value, x='name', y='value_score', title="가격 대비 긍정 리뷰 수")
-    st.plotly_chart(fig2)
-else:
-    st.warning("⚠️ 시각화를 위한 데이터가 부족합니다.")
+# Apply filters
+filtered_df = steam_df.copy()
+if name_query:
+    filtered_df = filtered_df[filtered_df['name'].str.contains(name_query, case=False, na=False)]
+if developer_filter:
+    filtered_df = filtered_df[filtered_df['developer'].isin(developer_filter)]
+if genre_filter:
+    filtered_df = filtered_df[filtered_df['genres'].isin(genre_filter)]
+filtered_df = filtered_df[(filtered_df['price'] >= price_range[0]) & (filtered_df['price'] <= price_range[1])]
 
-# 장르별 게임 수
-if 'genres' in steam.columns:
-    st.subheader("📚 장르별 게임 수")
-    genre_series = steam['genres'].dropna().str.split(';').explode()
-    genre_count = genre_series.value_counts().head(10)
-    st.bar_chart(genre_count)
-else:
-    st.warning("⚠️ 'genres' 컬럼이 없어 장르 분석이 불가능합니다.")
+st.subheader(f"🎯 총 {len(filtered_df)}개의 게임이 검색되었습니다.")
+st.dataframe(filtered_df[['name', 'release_date', 'developer', 'genres', 'price', 'positive_ratings', 'negative_ratings', 'average_playtime']])
 
-# 가장 많은 태그를 가진 게임
-if 'steamspy_tags' in steam.columns:
-    st.subheader("🏷️ 가장 많은 태그를 가진 게임 TOP 10")
-    tag_series = steam['steamspy_tags'].dropna().str.split(';').explode()
-    tag_count = tag_series.value_counts().head(10)
-    st.bar_chart(tag_count)
+# Game detail viewer
+st.subheader("🔎 게임 상세 정보 보기")
+selected_game = st.selectbox("게임 선택", filtered_df['name'].unique())
+detail = filtered_df[filtered_df['name'] == selected_game].iloc[0]
+
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown(f"**🧾 이름:** {detail['name']}")
+    st.markdown(f"**🛠 개발사:** {detail['developer']}")
+    st.markdown(f"**📅 출시일:** {detail['release_date']}")
+    st.markdown(f"**💰 가격:** ${detail['price']}")
+    st.markdown(f"**👍 추천:** {detail['positive_ratings']} / 👎 비추천: {detail['negative_ratings']}")
+    st.markdown(f"**⏱ 평균 플레이타임:** {detail['average_playtime']} 분")
+with col2:
+    if pd.notna(detail['website']):
+        st.markdown(f"[🌐 공식 웹사이트]({detail['website']})")
+    if pd.notna(detail['support_url']):
+        st.markdown(f"[🆘 지원 페이지]({detail['support_url']})")
+    if pd.notna(detail['support_email']):
+        st.markdown(f"📧 지원 이메일: {detail['support_email']}")
+
+# Tag filtering and visualization
+st.subheader("🏷 태그 기반 탐색")
+tag_columns = tags_df.drop(columns=["appid"]).columns
+selected_tags = st.multiselect("태그 선택 (여러 개 선택 가능)", tag_columns)
+
+if selected_tags:
+    tag_condition = steam_df[selected_tags].sum(axis=1) == len(selected_tags)
+    tagged_games = steam_df[tag_condition]
+    st.write(f"**'{', '.join(selected_tags)}' 태그를 모두 포함한 게임 수:** {len(tagged_games)}")
+    st.dataframe(tagged_games[['name', 'developer', 'genres', 'price']])
 else:
-    st.warning("⚠️ 'steamspy_tags' 컬럼이 없어 태그 정보를 표시할 수 없습니다.")
+    st.info("좌측에서 하나 이상의 태그를 선택하세요.")
