@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 
 # Load data from GitHub raw URLs
-github_base = "https://raw.githubusercontent.com/your-username/your-repo/main/"
 steam_df = pd.read_csv(github_base + "steam.csv")
 support_df = pd.read_csv(github_base + "steam_support_info.csv")
 tags_df = pd.read_csv(github_base + "steamspy_tag_data.csv")
