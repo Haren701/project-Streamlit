@@ -65,9 +65,10 @@ fig1 = px.scatter(
     x='price',
     y='positive_ratings',
     title='💰 가격 vs 👍 추천 수',
-    labels={'price': '가격($)', 'positive_ratings': '추천 수'},
-    trendline='ols'
+    labels={'price': '가격($)', 'positive_ratings': '추천 수'}
+    # trendline='ols'  # 제거됨
 )
+
 st.plotly_chart(fig1, use_container_width=True)
 
 # 2. 평균 플레이타임 vs 추천 수
@@ -80,9 +81,10 @@ fig2 = px.scatter(
     x='average_playtime',
     y='positive_ratings',
     title='⏱ 평균 플레이타임 vs 👍 추천 수',
-    labels={'average_playtime': '평균 플레이타임(분)', 'positive_ratings': '추천 수'},
-    trendline='ols'
+    labels={'average_playtime': '평균 플레이타임(분)', 'positive_ratings': '추천 수'}
+    # trendline='ols'  # 제거됨
 )
+
 st.plotly_chart(fig2, use_container_width=True)
 
 # 게임 상세 정보 보기
