@@ -48,47 +48,59 @@ st.dataframe(
 
 st.subheader("📊 시각화 자료")
 
-# 1. 가격 vs 추천 수 상관 히트맵 (가격은 버킷 처리)
+# 1. 가격 vs 추천 수 (가격 버킷 처리)
 binned_df = steam_df.copy()
-binned_df['price_bin'] = pd.cut(binned_df['price'], bins=[-1, 0, 5, 10, 20, 30, 60], labels=["무료", "$0~5", "$5~10", "$10~20", "$20~30", "$30~60"])
-price_group = binned_df.groupby('price_bin')['positive_ratings'].mean().reset_index()
+binned_df['가격 구간'] = pd.cut(
+    binned_df['price'],
+    bins=[-1, 0, 5, 10, 20, 30, 60],
+    labels=["무료", "0~5달러", "5~10달러", "10~20달러", "20~30달러", "30~60달러"]
+)
+price_group = binned_df.groupby('가격 구간')['positive_ratings'].mean().reset_index()
 
 fig_bar = px.bar(
     price_group,
-    x='price_bin',
+    x='가격 구간',
     y='positive_ratings',
     title='💰 가격 구간별 평균 추천 수',
-    labels={'price_bin': '가격 구간', 'positive_ratings': '평균 추천 수'}
+    labels={'가격 구간': '가격 구간', 'positive_ratings': '평균 추천 수'}
 )
 st.plotly_chart(fig_bar, use_container_width=True)
 
-# 2. 장르별 평균 플레이타임 및 추천 수
+# 2. 장르별 추천 수 및 플레이타임
 genre_df = steam_df[['genres', 'positive_ratings', 'average_playtime']].dropna()
 genre_rows = []
 
 for _, row in genre_df.iterrows():
     genres = str(row['genres']).split(';')
     for g in genres:
-        genre_rows.append({'genre': g.strip(), 'positive_ratings': row['positive_ratings'], 'average_playtime': row['average_playtime']})
+        genre_rows.append({'장르': g.strip(), '추천 수': row['positive_ratings'], '평균 플레이타임': row['average_playtime']})
 
 genre_expanded = pd.DataFrame(genre_rows)
-genre_summary = genre_expanded.groupby('genre').agg({
-    'positive_ratings': 'mean',
-    'average_playtime': 'mean'
-}).reset_index().sort_values(by='positive_ratings', ascending=False)
+genre_summary = genre_expanded.groupby('장르').agg({
+    '추천 수': 'mean',
+    '평균 플레이타임': 'mean'
+}).reset_index().sort_values(by='추천 수', ascending=False)
 
 fig_genre = px.bar(
     genre_summary.head(15),
-    x='genre',
-    y='positive_ratings',
+    x='장르',
+    y='추천 수',
     title='🔥 장르별 평균 추천 수 (상위 15개)',
-    labels={'genre': '장르', 'positive_ratings': '평균 추천 수'}
+    labels={'장르': '장르', '추천 수': '평균 추천 수'}
 )
 st.plotly_chart(fig_genre, use_container_width=True)
 
-# 3. 상관 계수 출력 (가격, 추천 수, 플레이타임 등)
+# 3. 상관 분석
 st.subheader("📈 변수 간 상관 분석")
+
+# 컬럼명 한글로 변경
 corr_df = steam_df[['price', 'positive_ratings', 'negative_ratings', 'average_playtime']].dropna()
-corr_matrix = corr_df.corr(numeric_only=True)
+corr_df_renamed = corr_df.rename(columns={
+    'price': '가격',
+    'positive_ratings': '추천 수',
+    'negative_ratings': '비추천 수',
+    'average_playtime': '평균 플레이타임'
+})
+corr_matrix = corr_df_renamed.corr(numeric_only=True)
 
 st.dataframe(corr_matrix.style.background_gradient(cmap='coolwarm'), use_container_width=True)
