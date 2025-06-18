@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 
 # Load data
-steam_df = pd.read_csv("/mnt/data/steam.csv")
-tags_df = pd.read_csv("/mnt/data/steamspy_tag_data.csv")
+steam_df = pd.read_csv("steam.csv")
+tags_df = pd.read_csv("steamspy_tag_data.csv")
 
 # Merge tag data
 steam_df = steam_df.merge(tags_df, on="appid", how="left")
